@@ -4,12 +4,14 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import initialize_agent, AgentType, Tool
 from datetime import datetime, timedelta
+from collections import defaultdict
 import requests
 import json
 from typing import Optional, Tuple, List, Dict
+from dateutil import parser as date_parser
 
 # === API Keys ===
-from my_api_key import api_key, weather_api_key
+from my_api_key import api_key, weather_api_key , another_api_key
 
 # === LLM Setup ===
 llm = ChatGoogleGenerativeAI(
@@ -64,87 +66,213 @@ def get_current_weather(city: Optional[str] = None) -> str:
     except:
         return "Error retrieving current weather."
 
-def get_forecast_daily(city: Optional[str] = None, days: int = 3) -> str:
-    """Get daily forecast for the next few days"""
-    if not city:
+# import requests
+# from typing import Optional
+# from datetime import datetime
+# from collections import defaultdict
+
+
+
+
+
+
+
+def get_forecast_for_datetime(city: Optional[str] = None, target_datetime: Optional[datetime] = None) -> str:
+    """Get the weather forecast closest to a specific datetime for a given city.
+    
+    If city or datetime is not provided, defaults to current location and current time.
+    """
+    # Default city if not provided
+    if city is None:
         city, _ = get_location_from_ip()
 
-    print(f"City from IP: {city}")
-    lat, lon = get_coordinates(city)
-    print(f"Coordinates: {lat}, {lon}")
-    if not lat:
-        return f"Could not find coordinates for {city}."
-    url = "https://api.openweathermap.org/data/2.5/forecast"
+    # Default datetime if not provided
+    if target_datetime is None:
+        target_datetime = datetime.now()
+
+    print(city)
+    print(target_datetime)
+
+    max_days_ahead = 3
+    now = datetime.now()
+    days_ahead = (target_datetime.date() - now.date()).days
+
+    if days_ahead < 0 or days_ahead >= max_days_ahead:
+        return f"❌ Can only fetch forecast up to {max_days_ahead} days ahead with the free plan."
+
+    url = "http://api.weatherapi.com/v1/forecast.json"
     params = {
-        "lat": lat, "lon": lon, "cnt": days,
-        "appid": weather_api_key, "units": "metric"
+        "key": another_api_key,
+        "q": city,
+        "days": days_ahead + 1,
+        "aqi": "no",
+        "alerts": "no"
     }
+
     try:
         res = requests.get(url, params=params)
         data = res.json()
-        print(f"Response: {data}")
-        return data
-        # if res.status_code != 200:
-        #     return f"Forecast not available for {city}."
-        # forecast = f"{days}-day forecast for {city}:\n"
-        # for d in data["list"]:
-        #     date = datetime.utcfromtimestamp(d["dt"]).strftime('%Y-%m-%d')
-        #     desc = d["weather"][0]["description"]
-        #     forecast += f"{date}: {desc}, {d['temp']['min']}°C - {d['temp']['max']}°C\n"
-        # return forecast
-    except:
-        return "Error retrieving forecast."
+        print(data)
 
-def get_historical_weather(city: Optional[str] = None, days: int = 3) -> str:
-    """Get weather history for past days"""
-    if not city:
-        city, _ = get_location_from_ip()
-        
-    print(f"City from IP: {city}")
-    lat, lon = get_coordinates(city)
-    if not lat:
-        return f"Coordinates not found for {city}."
+        if "forecast" not in data:
+            return "❌ Forecast data not available."
 
-    end_time = int(datetime.now().timestamp())
-    start_time = int((datetime.now() - timedelta(days=days)).timestamp())
+        # Collect all hourly forecasts
+        all_hours = []
+        for day in data["forecast"]["forecastday"]:
+            all_hours.extend(day["hour"])
 
-    url = "https://history.openweathermap.org/data/2.5/history/city"
-    params = {
-        "lat": lat, "lon": lon,
-        "type": "hour",
-        "start": start_time,
-        "end": end_time,
-        "appid": weather_api_key,
-        "units": "metric"
-    }
-    try:
-        res = requests.get(url, params=params)
-        data = res.json()
-        print(f"Response: {data}")
-        return data
-        # if res.status_code != 200 or "list" not in data:
-        #     return f"No historical data for {city}."
+        target_ts = int(target_datetime.timestamp())
+        closest = min(
+            all_hours, 
+            key=lambda h: abs(int(datetime.strptime(h["time"], "%Y-%m-%d %H:%M").timestamp()) - target_ts)
+        )
 
-        # history = f"Historical weather for {city} (last {days} days):\n"
-        # daily_temps = {}
+        time = closest["time"]
+        temp = closest["temp_c"]
+        feels_like = closest["feelslike_c"]
+        condition = closest["condition"]["text"]
+        wind = closest["wind_kph"]
+        humidity = closest["humidity"]
+        pressure = closest["pressure_mb"]
 
-        # for entry in data["list"]:
-        #     date = datetime.utcfromtimestamp(entry["dt"]).strftime('%Y-%m-%d')
-        #     temp = entry["main"]["temp"]
-        #     daily_temps.setdefault(date, []).append(temp)
 
-        # for date, temps in daily_temps.items():
-        #     history += f"{date}: Avg Temp {sum(temps)/len(temps):.1f}°C\n"
 
-        # return history
+        print(f"time {time}")   
+        print(f"temp {temp}")
+        print(f"feels_like {feels_like}")
+        print(f"condition {condition}")
+        print(f"wind {wind}")
+        print(f"humidity {humidity}")
+        print(f"pressure {pressure}")
+        # Format the output
+
+
+        return (
+            f"📍 Weather in {city} at {time}:\n"
+            f"🌡️ Temperature: {temp}°C (Feels like {feels_like}°C)\n"
+            f"🌬️ Wind Speed: {wind} kph\n"
+            f"💧 Humidity: {humidity}%\n"
+            f"📈 Pressure: {pressure} hPa\n"
+            f"📖 Condition: {condition}"
+        )
+
     except Exception as e:
-        return f"Error getting history: {str(e)}"
+        print(f"Exception: {e}")
+        return "❌ Error retrieving forecast."
+
+
+
+def parse_date(date_str: str) -> Optional[datetime]:
+    """Parse a date string with optional year. Return None if ambiguous."""
+    formats = ["%B %d %Y", "%b %d %Y", "%Y-%m-%d", "%B %d", "%b %d"]  # Full & partial formats
+    for fmt in formats:
+        try:
+            dt = datetime.strptime(date_str, fmt)
+            # If year missing, return None for clarity
+            if '%Y' not in fmt:
+                return None
+            return dt
+        except ValueError:
+            continue
+    return None
+def get_historical_weather(city: Optional[str] = None, target_date: Optional[datetime] = None, api_key: Optional[str] = None) -> str:
+    """
+    Get detailed historical weather for a city on a specific date.
+
+    If city is None, attempts to get location from IP.
+    If target_date is None, defaults to yesterday.
+    """
+
+   
+
+    # Default city if not provided
+    if city is None:
+        city, _ = get_location_from_ip()
+        if city is None:
+            return "❌ Could not determine your location automatically. Please specify a city."
+
+    # Default target_date if not provided: yesterday (historical data can't be today or future)
+    if target_date is None:
+        target_date = datetime.now() - timedelta(days=1)
+
+    # Format date for WeatherAPI: yyyy-mm-dd
+    date_str = target_date.strftime("%Y-%m-%d")
+
+    # Make sure the target date is not in the future or today
+    if target_date.date() >= datetime.now().date():
+        return "❌ Historical data is only available for past dates (not today or future)."
+
+    print(f"City: {city}")
+    print(f"Date: {date_str}")
+
+    url = "http://api.weatherapi.com/v1/history.json"
+    params = {
+        "key": another_api_key,
+        "q": city,
+        "dt": date_str,
+        "aqi": "no",
+        "alerts": "no"
+    }
+
+    try:
+        res = requests.get(url, params=params)
+        data = res.json()
+        print(f"API response: {data}")
+
+        if "forecast" not in data or "forecastday" not in data["forecast"]:
+            return f"❌ No historical weather data found for {city} on {date_str}."
+
+        day_data = data["forecast"]["forecastday"][0]["day"]
+
+        max_temp = day_data["maxtemp_c"]
+        min_temp = day_data["mintemp_c"]
+        avg_temp = day_data["avgtemp_c"]
+        max_wind = day_data["maxwind_kph"]
+        total_precip = day_data["totalprecip_mm"]
+        avg_humidity = day_data["avghumidity"]
+        condition = day_data["condition"]["text"]
+
+        print(f"Max Temp: {max_temp}°C")
+        print(f"Min Temp: {min_temp}°C")
+        print(f"Avg Temp: {avg_temp}°C")
+        print(f"Max Wind: {max_wind} kph")
+        print(f"Total Precipitation: {total_precip} mm")
+        print(f"Avg Humidity: {avg_humidity}%")
+        print(f"Condition: {condition}")
+
+        return (
+            f"📅 Historical weather in {city} on {date_str}:\n"
+            f"🌡️ Max Temp: {max_temp}°C\n"
+            f"🌡️ Min Temp: {min_temp}°C\n"
+            f"🌡️ Avg Temp: {avg_temp}°C\n"
+            f"🌬️ Max Wind Speed: {max_wind} kph\n"
+            f"💧 Total Precipitation: {total_precip} mm\n"
+            f"💧 Avg Humidity: {avg_humidity}%\n"
+            f"📖 Condition: {condition}"
+        )
+
+    except Exception as e:
+        print(f"Exception: {e}")
+        return "❌ Error retrieving historical weather."
+
+
 
 # === LangChain Agent Tools ===
 tools = [
     Tool(name="CurrentWeather", func=get_current_weather, description="Get current weather if no city name is provided, it will use your current location"),
-    Tool(name="ForecastWeather", func=get_forecast_daily, description="Get daily weather forecast , get tomorrow forecast if no city name is provided, it will use your current location"),
-    Tool(name="HistoricalWeather", func=get_historical_weather, description="Get past weather data for the last 3–4 days like yesterday also if no city name is provided, it will use your current location"),
+    Tool(name="ForecastWeather", func=get_forecast_for_datetime, description="GUse this tool to get the weather forecast for any specific time (date and hour) within the next 3 days for a given city. It returns temperature, wind speed, humidity, pressure, and weather conditions. Make sure to pass the city and date as to the fucntion. if no city name is provided, it will use your current location"),
+    Tool(
+    name="HistoricalWeather",
+    func=get_historical_weather,
+    description=(
+        "Fetch detailed historical weather data for a specific city and date. "
+        "If no city is provided, the function uses your current location automatically. "
+        "If no date is given, it defaults to yesterday's weather. "
+        "Provides information such as temperature highs and lows, wind speed, precipitation, humidity, and conditions. "
+        "Note: Supports dates up to a few days in the past."
+    )
+)
 ]
 
 # === Initialize LangChain Agent ===
