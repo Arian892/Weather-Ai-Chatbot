@@ -9,9 +9,17 @@ import requests
 import json
 from typing import Optional, Tuple, List, Dict
 from dateutil import parser as date_parser
+from langchain.agents import AgentExecutor, create_structured_chat_agent
+from langchain.prompts import MessagesPlaceholder
+from langchain_core.prompts.chat import ChatPromptTemplate
+from  models import QueryHistory , Session, log_query_to_db, load_recent_history
+
 
 # === API Keys ===
 from my_api_key import api_key, weather_api_key , another_api_key
+
+
+# Add system message enforcing behavior
 
 # === LLM Setup ===
 llm = ChatGoogleGenerativeAI(
@@ -22,13 +30,24 @@ llm = ChatGoogleGenerativeAI(
 
 # === Utility Functions ===
 def get_location_from_ip() -> Tuple[Optional[str], Optional[str]]:
-    """Get city and country from IP address"""
+    """Get city and country from IP address using ipinfo.io"""
     try:
-        res = requests.get("https://ipinfo.io/json")
+        res = requests.get("https://ipinfo.io/json", timeout=5)
+        res.raise_for_status()  # Raise HTTPError if not 200
         data = res.json()
-        return data.get("city"), data.get("country")
-    except:
-        return None, None
+        city = data.get("city")
+        country = data.get("country")
+        if not city or not country:
+            print("Warning: Incomplete location data:", data)
+        return city, country
+    except requests.exceptions.RequestException as e:
+        print("Network or HTTP error:", e)
+    except ValueError as e:
+        print("JSON decode error:", e)
+    except Exception as e:
+        print("Unexpected error:", e)
+    return None, None
+
 
 def get_coordinates(city: str) -> Tuple[Optional[float], Optional[float]]:
     """Get latitude and longitude using city name"""
@@ -46,6 +65,8 @@ def get_coordinates(city: str) -> Tuple[Optional[float], Optional[float]]:
 # === Weather API Calls ===
 def get_current_weather(city: Optional[str] = None) -> str:
     """Get current weather data"""
+    print("get current weather function callled")
+    print(f"[DEBUG] city argument value: {repr(city)}")
     if not city:
         city, _ = get_location_from_ip()
         print(f"City from IP: {city}")
@@ -78,20 +99,26 @@ def get_current_weather(city: Optional[str] = None) -> str:
 
 
 def get_forecast_for_datetime(city: Optional[str] = None, target_datetime: Optional[datetime] = None) -> str:
+
+
+    print("get forecast function callled")
+    print(f"[DEBUG] city argument value: {repr(city)}")
+
     """Get the weather forecast closest to a specific datetime for a given city.
     
     If city or datetime is not provided, defaults to current location and current time.
     """
     # Default city if not provided
-    if city is None:
+    if not city:
         city, _ = get_location_from_ip()
+        print(f"City from IP: {city}")
 
     # Default datetime if not provided
     if target_datetime is None:
         target_datetime = datetime.now()
 
-    print(city)
-    print(target_datetime)
+    print(f"City: {city}")
+    print(f"Target Datetime: {target_datetime}")
 
     max_days_ahead = 3
     now = datetime.now()
@@ -183,14 +210,14 @@ def get_historical_weather(city: Optional[str] = None, target_date: Optional[dat
     If city is None, attempts to get location from IP.
     If target_date is None, defaults to yesterday.
     """
+    print("get forecast function callled")
 
    
 
     # Default city if not provided
-    if city is None:
+    if not city:
         city, _ = get_location_from_ip()
-        if city is None:
-            return "❌ Could not determine your location automatically. Please specify a city."
+        print(f"City from IP: {city}")
 
     # Default target_date if not provided: yesterday (historical data can't be today or future)
     if target_date is None:
@@ -261,7 +288,13 @@ def get_historical_weather(city: Optional[str] = None, target_date: Optional[dat
 # === LangChain Agent Tools ===
 tools = [
     Tool(name="CurrentWeather", func=get_current_weather, description="Get current weather if no city name is provided, it will use your current location"),
-    Tool(name="ForecastWeather", func=get_forecast_for_datetime, description="GUse this tool to get the weather forecast for any specific time (date and hour) within the next 3 days for a given city. It returns temperature, wind speed, humidity, pressure, and weather conditions. Make sure to pass the city and date as to the fucntion. if no city name is provided, it will use your current location"),
+    Tool(name="ForecastWeather", func=get_forecast_for_datetime, description=(
+        "Get weather forecast for a specific city and date. "
+        "If no city is provided, the function uses your current location automatically. "
+        "If no date is given, it defaults to the current date. "
+        "Note: Only supports dates up to 3 days in the future."
+    )
+    ),
     Tool(
     name="HistoricalWeather",
     func=get_historical_weather,
@@ -275,6 +308,9 @@ tools = [
 )
 ]
 
+
+
+
 # === Initialize LangChain Agent ===
 agent = initialize_agent(
     tools=tools,
@@ -285,11 +321,26 @@ agent = initialize_agent(
 )
 
 # === Final Query Processing ===
+
+
 def process_weather_query(query: str) -> str:
     try:
-        return agent.run(query)
+        # Load recent history as context string
+        context = load_recent_history()
+
+        # Combine context + new query
+        full_input = f"{context}\n\nUser: {query}\nAssistant:"
+
+        # Run the agent on this combined input
+        response = agent.run(full_input)
+
+        # Log new query & response as usual
+        log_query_to_db(query, response)
+
+        return response
     except Exception as e:
         return f"Error: {str(e)}"
+
 
 # === Entry Point ===
 if __name__ == "__main__":
