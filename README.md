@@ -4,7 +4,8 @@ This is a conversational weather assistant powered by:
 
 - **LangChain** for chaining LLM calls  
 - **Google Gemini (via Generative AI)** for conversational AI  
-- **OpenWeatherMap API** for weather data  
+- **OpenWeatherMap API** for current weather data  
+- **weather API** for historical and forecast
 - **ElevenLabs** for voice synthesis (text-to-speech)  
 - **SpeechRecognition** for voice input (speech-to-text)  
 - **SQLAlchemy** for query history storage  
@@ -117,7 +118,7 @@ weather-agent-gemini/
 
 ## 📌 Notes
 
-- Historical weather data may require a paid plan from OpenWeatherMap.
+
 - IP-based location detection may be inaccurate if using VPN or proxies.
 - You can enhance this project with:
   - LangChain memory
