@@ -1,14 +1,27 @@
-# 🌦️ Weather Agent using LangChain and Gemini
+# 🌦️ Weather Agent using LangChain, Gemini, and Voice I/O
 
-This is a conversational weather assistant powered by **LangChain**, **Google Gemini (via Generative AI)**, and the **OpenWeatherMap API**. It allows users to:
+This is a conversational weather assistant powered by:
 
-- 🌤️ Fetch **current weather**
-- 📅 Provide **daily forecasts**
-- 🕰️ Retrieve **historical weather data**
+- **LangChain** for chaining LLM calls  
+- **Google Gemini (via Generative AI)** for conversational AI  
+- **OpenWeatherMap API** for weather data  
+- **ElevenLabs** for voice synthesis (text-to-speech)  
+- **SpeechRecognition** for voice input (speech-to-text)  
+- **SQLAlchemy** for query history storage  
+- **Streamlit** for the web interface  
+
+It allows users to:
+
+- 🌤️ Fetch **current weather**  
+- 📅 Provide **forecasts for any date/time**  
+- 🕰️ Retrieve **historical weather data**  
+- 🎤 Speak and listen via voice commands (optional)  
+- 📚 Keep a persistent query history for contextual follow-ups  
 
 If no city is provided, it detects your location automatically using your IP address.
 
 ---
+
 
 ## ✅ Requirements
 
@@ -18,6 +31,8 @@ Before you begin, ensure you have the following:
 - API keys for:
   - [Google Generative AI (Gemini)](https://makersuite.google.com/)
   - [OpenWeatherMap](https://openweathermap.org/api)
+  - [weatherapi](http://weatherapi.com)
+  - [ElevenLabs](https://elevenlabs.io/)
 
 ---
 
@@ -33,7 +48,7 @@ cd Weather-Ai-Chatbot
 ### 2. Install the required Python packages
 
 ```bash
-pip install langchain requests streamlit langchain-google-genai
+pip install langchain requests streamlit langchain-google-genai elevenlabs SpeechRecognition sqlalchemy dateparser
 ```
 
 > Optionally, create a `requirements.txt` with the above lines and run:
@@ -49,6 +64,10 @@ Create a `my_api_key.py` file in the root directory of your project:
 # my_api_key.py
 api_key = "your_google_gemini_api_key"
 weather_api_key = "your_openweathermap_api_key"
+another_api_key = 'you weatherapi key'
+text_analytics_api_key = "your_text_analytics_api_key"  # if used
+
+
 ```
 
 ⚠️ **Important:** Do not share or commit this file to GitHub.
