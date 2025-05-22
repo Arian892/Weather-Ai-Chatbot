@@ -1,5 +1,6 @@
 import streamlit as st
-from weatherAgent import process_weather_query
+# from weatherAgent import process_weather_query
+from weatherAgent import process_weather_query  # ✅ Main agent function
 from voice_input import record_and_transcribe  # ✅ Voice input function
 from voice_output import speak  # ✅ Voice output function
 
@@ -13,7 +14,7 @@ if "messages" not in st.session_state:
         {"role": "assistant", "content": "Hi! I'm your weather assistant. Ask me about current conditions, forecasts, or historical weather."}
     ]
 
-# Chat display
+# Chat disoplay
 chat_container = st.container()
 with chat_container:
     for i, message in enumerate(st.session_state.messages):

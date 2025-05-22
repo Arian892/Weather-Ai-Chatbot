@@ -1,25 +1,21 @@
 # voice_input.py
-import sounddevice as sd
-import queue
-import json
-from vosk import Model, KaldiRecognizer
-
-q = queue.Queue()
-model = Model("model")  # make sure this is the correct model directory
-samplerate = 16000
-
-def callback(indata, frames, time, status):
-    q.put(bytes(indata))
+import speech_recognition as sr
 
 def record_and_transcribe(duration=5):
-    rec = KaldiRecognizer(model, samplerate)
-    with sd.RawInputStream(samplerate=samplerate, blocksize=8000, dtype='int16',
-                           channels=1, callback=callback):
+    recognizer = sr.Recognizer()
+
+    with sr.Microphone() as source:
         print("Recording...")
-        for _ in range(0, int(samplerate / 8000 * duration)):
-            data = q.get()
-            if rec.AcceptWaveform(data):
-                break
+        # Adjust for ambient noise
+        recognizer.adjust_for_ambient_noise(source)
+        audio = recognizer.listen(source, phrase_time_limit=duration)
         print("Done.")
-    result = json.loads(rec.Result())
-    return result.get("text", "")
+
+    try:
+        # You can replace 'recognize_google' with other engines if needed
+        text = recognizer.recognize_google(audio)
+        return text
+    except sr.UnknownValueError:
+        return "❌ Could not understand the audio."
+    except sr.RequestError as e:
+        return f"❌ Could not request results; {e}"
