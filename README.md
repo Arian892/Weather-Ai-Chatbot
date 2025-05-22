@@ -96,6 +96,8 @@ Try asking:
 - Show me the forecast for Tokyo.
 - What was the temperature in Paris 3 days ago?
 - What's the humidity in Mumbai today?
+- *Say something via mic and hear the assistant reply!*  
+
 
 ---
 
@@ -120,10 +122,12 @@ weather-agent-gemini/
 
 
 - IP-based location detection may be inaccurate if using VPN or proxies.
-- You can enhance this project with:
-  - LangChain memory
-  - Voice I/O (e.g., ElevenLabs)
-  - Vector search for context-aware weather conversations
+- Query history enables conversational context and follow-up questions.
+- Voice I/O depends on ElevenLabs and SpeechRecognition—microphone and speakers required.
+- Feel free to extend with:
+  - LangChain memory integration
+  - More robust conversational context handling
+  - Additional weather data sources or features
 
 ---
 
