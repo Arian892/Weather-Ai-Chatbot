@@ -63,10 +63,13 @@ def get_coordinates(city: str) -> Tuple[Optional[float], Optional[float]]:
         return None, None
 
 # === Weather API Calls ===
+from datetime import datetime
+
 def get_current_weather(city: Optional[str] = None) -> str:
     """Get current weather data"""
     print("get current weather function callled")
     print(f"[DEBUG] city argument value: {repr(city)}")
+
     if not city:
         city, _ = get_location_from_ip()
         print(f"City from IP: {city}")
@@ -77,12 +80,16 @@ def get_current_weather(city: Optional[str] = None) -> str:
         data = res.json()
         if res.status_code != 200:
             return f"Weather unavailable for {city}."
+
+        today = datetime.now().strftime("%B %d, %Y")  # <- Correct date string
+
         return (
-            f"Current weather in {city}:\n"
-            f"• Temp: {data['main']['temp']}°C (feels like {data['main']['feels_like']}°C)\n"
-            f"• {data['weather'][0]['description'].capitalize()}\n"
-            f"• Humidity: {data['main']['humidity']}%\n"
-            f"• Wind: {data['wind']['speed']} m/s"
+            f"📅 Today is {today}\n"
+            f"📍 Current weather in {city}:\n"
+            f"🌡️ Temp: {data['main']['temp']}°C (Feels like {data['main']['feels_like']}°C)\n"
+            f"📖 {data['weather'][0]['description'].capitalize()}\n"
+            f"💧 Humidity: {data['main']['humidity']}%\n"
+            f"🌬️ Wind: {data['wind']['speed']} m/s"
         )
     except:
         return "Error retrieving current weather."
@@ -288,13 +295,17 @@ def get_historical_weather(city: Optional[str] = None, target_date: Optional[dat
 # === LangChain Agent Tools ===
 tools = [
     Tool(name="CurrentWeather", func=get_current_weather, description="Get current weather if no city name is provided, it will use your current location"),
-    Tool(name="ForecastWeather", func=get_forecast_for_datetime, description=(
-        "Get weather forecast for a specific city and date. "
-        "If no city is provided, the function uses your current location automatically. "
-        "If no date is given, it defaults to the current date. "
-        "Note: Only supports dates up to 3 days in the future."
+    Tool(
+    name="GetTomorrowForecast",
+    func=get_forecast_for_datetime,
+    description=(
+        "Get the weather forecast for a specific date (e.g., 'tomorrow', 'next Monday') for a given or current location. "
+        "Use this for queries like 'weather update tomorrow', 'forecast for Sunday in Dhaka', etc. "
+        "Works even if no city is mentioned (uses current location)."
     )
-    ),
+    )
+
+    ,
     Tool(
     name="HistoricalWeather",
     func=get_historical_weather,
@@ -316,7 +327,7 @@ agent = initialize_agent(
     tools=tools,
     llm=llm,
     agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=False,
+    verbose=True,
     handle_parsing_errors=True
 )
 
