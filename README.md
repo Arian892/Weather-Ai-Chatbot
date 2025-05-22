@@ -102,11 +102,15 @@ Try asking:
 
 ```
 weather-agent-gemini/
-├── app.py               # Streamlit frontend
-├── weatherAgent.py      # LangChain agent logic and tools
-├── my_api_key.py        # Your API keys (excluded from version control)
-├── requirements.txt     # (Optional) dependencies list
-└── README.md            # This file
+├── app.py                  # Streamlit frontend with voice I/O and query history
+├── weatherAgent.py         # Core LangChain agent and weather API tools
+├── voice_input.py          # Microphone recording and speech-to-text
+├── voice_output.py         # Text-to-speech using ElevenLabs
+├── models.py               # SQLAlchemy models and DB setup for query history
+├── my_api_key.py           # Your API keys (excluded from git)
+├── requirements.txt        # Python dependencies
+└── README.md               # This file
+
 ```
 
 ---
